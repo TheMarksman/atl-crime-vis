@@ -20,7 +20,7 @@ const paths = {
 };
 
 gulp.task('styles', () => {
-    return gulp.src(paths.src)
+    return gulp.src(paths.src + '/*.sass')
         .pipe(sourcemaps.init())
         .pipe(sass())
         .pipe(autoprefixer())
@@ -47,7 +47,7 @@ gulp.task('serve', () => {
 
         gulp.watch('src/app.sass', ['styles']);
         gulp.watch('src/**/*.js', ['build']);
-        gulp.watch(paths.dest).on('change', browser.reload);
+        gulp.watch(paths.dest + '/**/*.*').on('change', browser.reload);
         gulp.watch('index.html').on('change', browser.reload);
 });
 
