@@ -1,5 +1,13 @@
 #map {
   height: 800px;
   width: 1000px; }
+  #map .neighborhood {
+    fill: #448AFF;
+    opacity: 0.2;
+    stroke: #003399;
+    stroke-width: 1.5px; }
+    #map .neighborhood:hover {
+      fill: #4CAF50;
+      fill-opacity: 0.7; }
 
 /*# sourceMappingURL=app.css.map */
