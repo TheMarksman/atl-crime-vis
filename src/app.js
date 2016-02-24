@@ -2,6 +2,7 @@ import 'babel-polyfill';
 import L from 'leaflet';
 import d3 from 'd3';
 import topojson from 'topojson';
+import queue from 'd3-queue';
 
 let url = 'http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
 let osmAttrib='&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="http://cartodb.com/attributions">CartoDB</a>';
@@ -14,14 +15,46 @@ map.addLayer(osm);
 let svg = d3.select(map.getPanes().overlayPane).append('svg'),
     g = svg.append('g').classed({'leaflet-zoom-hide': 1});
 
+let neighborhoods,
+    crimes;
 
-d3.json('neighborhoods.json', (error, data) => {
-    if (error) {
-        throw error;
-    }
+let loadNeighborhoods = (callback) => {
+  d3.json('neighborhoods.json', (err, data) => {
+      saveNeighborhoods(err, data, callback);
+  });
+};
 
-    let neighborhoods = topojson.feature(data, data.objects.neighborhoods);
+let saveNeighborhoods = (err, data, callback) => {
+  if (err) {
+    throw err;
+  }
+  neighborhoods = topojson.feature(data, data.objects.neighborhoods);
+  console.log('neighborhoods', neighborhoods);
+  callback(null);
+}
 
+let loadCrimes = (callback) => {
+  d3.csv('atl-crime-data-2015.csv',  (err, data) => {
+      saveCrimes(err, data, callback);
+  });
+};
+
+let saveCrimes = (err, data, callback) => {
+  if (err) {
+    throw err;
+  }
+  crimes = data;
+  console.log('crimes', crimes);
+  callback(null);
+};
+
+let drawAll = () => {
+  drawNeighborhoods();
+  drawCrimeData();
+};
+
+let drawNeighborhoods = () => {
+    console.log('drawing neighhborhoods', neighborhoods)
     let transform = d3.geo.transform({ point: projectPoint });
 
     let path = d3.geo.path()
@@ -38,7 +71,6 @@ d3.json('neighborhoods.json', (error, data) => {
     map.on('viewreset', reset);
 
     reset();
-
 
     function reset() {
         let bounds = path.bounds(neighborhoods),
@@ -58,7 +90,16 @@ d3.json('neighborhoods.json', (error, data) => {
 
         neighborhood.attr('d', path);
     }
-});
+};
+
+let drawCrimeData = () => {
+  console.log('drawing crime')
+};
+
+let loadingQueue = queue.queue()
+  .defer(loadNeighborhoods)
+  .defer(loadCrimes)
+  .awaitAll(drawAll);
 
 function projectPoint(x, y) {
     let point = map.latLngToLayerPoint(new L.LatLng(y, x));

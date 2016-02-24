@@ -31,6 +31,7 @@
     "babelify": "^7.2.0",
     "browser-sync": "^2.11.1",
     "browserify": "^13.0.0",
+    "gulp": "^3.9.1",
     "gulp-autoprefixer": "^3.1.0",
     "gulp-babel": "^6.1.2",
     "gulp-concat": "^2.6.0",
@@ -42,6 +43,8 @@
   },
   "dependencies": {
     "d3": "^3.5.14",
-    "leaflet": "^0.7.7"
+    "d3-queue": "^2.0.2",
+    "leaflet": "^0.7.7",
+    "topojson": "^1.6.24"
   }
 }

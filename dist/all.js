@@ -4506,9 +4506,127 @@ process.chdir = function (dir) {
 process.umask = function() { return 0; };
 
 },{}],191:[function(require,module,exports){
+(function (global, factory) {
+  typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
+  typeof define === 'function' && define.amd ? define(['exports'], factory) :
+  (factory((global.d3_queue = {})));
+}(this, function (exports) { 'use strict';
+
+  var slice = [].slice;
+
+  function noop() {}
+
+  var noabort = {};
+
+  function newQueue(concurrency) {
+    if (!(concurrency >= 1)) throw new Error;
+
+    var q,
+        tasks = [],
+        results = [],
+        waiting = 0,
+        active = 0,
+        ended = 0,
+        starting, // inside a synchronous task callback?
+        error = null,
+        notify = noop;
+
+    function poke() {
+      if (!starting) try { start(); } // let the current task complete
+      catch (e) { if (tasks[ended + active - 1]) abort(e); } // task errored synchronously
+    }
+
+    function start() {
+      while (starting = waiting && active < concurrency) {
+        var i = ended + active,
+            t = tasks[i],
+            j = t.length - 1,
+            c = t[j];
+        t[j] = end(i);
+        --waiting, ++active;
+        t = c.apply(null, t);
+        if (!tasks[i]) continue; // task finished synchronously
+        tasks[i] = t || noabort;
+      }
+    }
+
+    function end(i) {
+      return function(e, r) {
+        if (!tasks[i]) return; // ignore multiple callbacks
+        --active, ++ended;
+        tasks[i] = null;
+        if (error != null) return; // ignore secondary errors
+        if (e != null) {
+          abort(e);
+        } else {
+          results[i] = r;
+          if (waiting) poke();
+          else if (!active) notify(error, results);
+        }
+      };
+    }
+
+    function abort(e) {
+      var i = tasks.length, t;
+      error = e; // ignore active callbacks
+      results = undefined; // allow gc
+      waiting = NaN; // prevent starting
+
+      while (--i >= 0) {
+        if (t = tasks[i]) {
+          tasks[i] = null;
+          if (t.abort) try { t.abort(); }
+          catch (e) { /* ignore */ }
+        }
+      }
+
+      active = NaN; // allow notification
+      notify(error, results);
+    }
+
+    return q = {
+      defer: function(callback) {
+        if (typeof callback !== "function" || notify !== noop) throw new Error;
+        if (error != null) return q;
+        var t = slice.call(arguments, 1);
+        t.push(callback);
+        ++waiting, tasks.push(t);
+        poke();
+        return q;
+      },
+      abort: function() {
+        if (error == null) abort(new Error("abort"));
+        return q;
+      },
+      await: function(callback) {
+        if (typeof callback !== "function" || notify !== noop) throw new Error;
+        notify = function(error, results) { callback.apply(null, [error].concat(results)); };
+        if (!active) notify(error, results);
+        return q;
+      },
+      awaitAll: function(callback) {
+        if (typeof callback !== "function" || notify !== noop) throw new Error;
+        notify = callback;
+        if (!active) notify(error, results);
+        return q;
+      }
+    };
+  }
+
+  function queue(concurrency) {
+    return newQueue(arguments.length ? +concurrency : Infinity);
+  }
+
+  var version = "2.0.2";
+
+  exports.version = version;
+  exports.queue = queue;
+
+}));
+},{}],192:[function(require,module,exports){
 !function() {
   var d3 = {
-    version: "3.5.14"
+    version: "3.5.16"
   };
   var d3_arraySlice = [].slice, d3_array = function(list) {
     return d3_arraySlice.call(list);
@@ -4728,20 +4846,20 @@ process.umask = function() { return 0; };
     while (i < n) pairs[i] = [ p0 = p1, p1 = array[++i] ];
     return pairs;
   };
-  d3.zip = function() {
-    if (!(n = arguments.length)) return [];
-    for (var i = -1, m = d3.min(arguments, d3_zipLength), zips = new Array(m); ++i < m; ) {
-      for (var j = -1, n, zip = zips[i] = new Array(n); ++j < n; ) {
-        zip[j] = arguments[j][i];
+  d3.transpose = function(matrix) {
+    if (!(n = matrix.length)) return [];
+    for (var i = -1, m = d3.min(matrix, d3_transposeLength), transpose = new Array(m); ++i < m; ) {
+      for (var j = -1, n, row = transpose[i] = new Array(n); ++j < n; ) {
+        row[j] = matrix[j][i];
       }
     }
-    return zips;
+    return transpose;
   };
-  function d3_zipLength(d) {
+  function d3_transposeLength(d) {
     return d.length;
   }
-  d3.transpose = function(matrix) {
-    return d3.zip.apply(d3, matrix);
+  d3.zip = function() {
+    return d3.transpose(arguments);
   };
   d3.keys = function(map) {
     var keys = [];
@@ -5128,9 +5246,10 @@ process.umask = function() { return 0; };
       return d3_selectAll(selector, this);
     };
   }
+  var d3_nsXhtml = "http://www.w3.org/1999/xhtml";
   var d3_nsPrefix = {
     svg: "http://www.w3.org/2000/svg",
-    xhtml: "http://www.w3.org/1999/xhtml",
+    xhtml: d3_nsXhtml,
     xlink: "http://www.w3.org/1999/xlink",
     xml: "http://www.w3.org/XML/1998/namespace",
     xmlns: "http://www.w3.org/2000/xmlns/"
@@ -5313,7 +5432,7 @@ process.umask = function() { return 0; };
   function d3_selection_creator(name) {
     function create() {
       var document = this.ownerDocument, namespace = this.namespaceURI;
-      return namespace && namespace !== document.documentElement.namespaceURI ? document.createElementNS(namespace, name) : document.createElement(name);
+      return namespace === d3_nsXhtml && document.documentElement.namespaceURI === d3_nsXhtml ? document.createElement(name) : document.createElementNS(namespace, name);
     }
     function createNS() {
       return this.ownerDocument.createElementNS(name.space, name.local);
@@ -5712,7 +5831,7 @@ process.umask = function() { return 0; };
     }
     function dragstart(id, position, subject, move, end) {
       return function() {
-        var that = this, target = d3.event.target, parent = that.parentNode, dispatch = event.of(that, arguments), dragged = 0, dragId = id(), dragName = ".drag" + (dragId == null ? "" : "-" + dragId), dragOffset, dragSubject = d3.select(subject(target)).on(move + dragName, moved).on(end + dragName, ended), dragRestore = d3_event_dragSuppress(target), position0 = position(parent, dragId);
+        var that = this, target = d3.event.target.correspondingElement || d3.event.target, parent = that.parentNode, dispatch = event.of(that, arguments), dragged = 0, dragId = id(), dragName = ".drag" + (dragId == null ? "" : "-" + dragId), dragOffset, dragSubject = d3.select(subject(target)).on(move + dragName, moved).on(end + dragName, ended), dragRestore = d3_event_dragSuppress(target), position0 = position(parent, dragId);
         if (origin) {
           dragOffset = origin.apply(that, arguments);
           dragOffset = [ dragOffset.x - position0[0], dragOffset.y - position0[1] ];
@@ -14059,7 +14178,7 @@ process.umask = function() { return 0; };
   });
   if (typeof define === "function" && define.amd) this.d3 = d3, define(d3); else if (typeof module === "object" && module.exports) module.exports = d3; else this.d3 = d3;
 }();
-},{}],192:[function(require,module,exports){
+},{}],193:[function(require,module,exports){
 /*
  Leaflet, a JavaScript library for mobile-friendly interactive maps. http://leafletjs.com
  (c) 2010-2013, Vladimir Agafonkin
@@ -23228,80 +23347,7 @@ L.Map.include({
 
 
 }(window, document));
-},{}],193:[function(require,module,exports){
-'use strict';
-
-require('babel-polyfill');
-
-var _leaflet = require('leaflet');
-
-var _leaflet2 = _interopRequireDefault(_leaflet);
-
-var _d = require('d3');
-
-var _d2 = _interopRequireDefault(_d);
-
-var _topojson = require('topojson');
-
-var _topojson2 = _interopRequireDefault(_topojson);
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-var url = 'http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
-var osmAttrib = '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="http://cartodb.com/attributions">CartoDB</a>';
-var osm = new _leaflet2.default.TileLayer(url, { minZoom: 11, maxZoom: 18, attribution: osmAttrib });
-
-var map = _leaflet2.default.map('map').setView(new _leaflet2.default.LatLng(33.755, -84.390), 11);
-
-map.addLayer(osm);
-
-var svg = _d2.default.select(map.getPanes().overlayPane).append('svg'),
-    g = svg.append('g').classed({ 'leaflet-zoom-hide': 1 });
-
-_d2.default.json('neighborhoods.json', function (error, data) {
-    if (error) {
-        throw error;
-    }
-
-    var neighborhoods = _topojson2.default.feature(data, data.objects.neighborhoods);
-
-    var transform = _d2.default.geo.transform({ point: projectPoint });
-
-    var path = _d2.default.geo.path().projection(transform);
-
-    console.log(neighborhoods.features);
-
-    var neighborhood = g.selectAll('.neighborhood').data(neighborhoods.features).enter().insert('path').classed({ 'neighborhood': 1 });
-
-    map.on('viewreset', reset);
-
-    reset();
-
-    function reset() {
-        var bounds = path.bounds(neighborhoods),
-            topLeft = bounds[0],
-            bottomRight = bounds[1];
-
-        svg.attr({
-            'width': bottomRight[0] - topLeft[1],
-            'height': bottomRight[1] - topLeft[1]
-        }).style({
-            'left': topLeft[0] + 'px',
-            'top': topLeft[1] + 'px'
-        });
-
-        g.attr({ transform: 'translate(' + -topLeft[0] + ', ' + -topLeft[1] + ')' });
-
-        neighborhood.attr('d', path);
-    }
-});
-
-function projectPoint(x, y) {
-    var point = map.latLngToLayerPoint(new _leaflet2.default.LatLng(y, x));
-    this.stream.point(point.x, point.y);
-}
-
-},{"babel-polyfill":1,"d3":191,"leaflet":192,"topojson":194}],194:[function(require,module,exports){
+},{}],194:[function(require,module,exports){
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
   typeof define === 'function' && define.amd ? define(['exports'], factory) :
@@ -23838,7 +23884,7 @@ function projectPoint(x, y) {
     return topology;
   }
 
-  var version = "1.6.22";
+  var version = "1.6.24";
 
   exports.version = version;
   exports.mesh = mesh;
@@ -23850,7 +23896,123 @@ function projectPoint(x, y) {
   exports.presimplify = presimplify;
 
 }));
-},{}]},{},[193])
+},{}],195:[function(require,module,exports){
+'use strict';
+
+require('babel-polyfill');
+
+var _leaflet = require('leaflet');
+
+var _leaflet2 = _interopRequireDefault(_leaflet);
+
+var _d = require('d3');
+
+var _d2 = _interopRequireDefault(_d);
+
+var _topojson = require('topojson');
+
+var _topojson2 = _interopRequireDefault(_topojson);
+
+var _d3Queue = require('d3-queue');
+
+var _d3Queue2 = _interopRequireDefault(_d3Queue);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+var url = 'http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
+var osmAttrib = '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="http://cartodb.com/attributions">CartoDB</a>';
+var osm = new _leaflet2.default.TileLayer(url, { minZoom: 11, maxZoom: 18, attribution: osmAttrib });
+
+var map = _leaflet2.default.map('map').setView(new _leaflet2.default.LatLng(33.755, -84.390), 11);
+
+map.addLayer(osm);
+
+var svg = _d2.default.select(map.getPanes().overlayPane).append('svg'),
+    g = svg.append('g').classed({ 'leaflet-zoom-hide': 1 });
+
+var neighborhoods = undefined,
+    crimes = undefined;
+
+var loadNeighborhoods = function loadNeighborhoods(callback) {
+    _d2.default.json('neighborhoods.json', function (err, data) {
+        saveNeighborhoods(err, data, callback);
+    });
+};
+
+var saveNeighborhoods = function saveNeighborhoods(err, data, callback) {
+    if (err) {
+        throw err;
+    }
+    neighborhoods = _topojson2.default.feature(data, data.objects.neighborhoods);
+    console.log('neighborhoods', neighborhoods);
+    callback(null);
+};
+
+var loadCrimes = function loadCrimes(callback) {
+    _d2.default.csv('atl-crime-data-2015.csv', function (err, data) {
+        saveCrimes(err, data, callback);
+    });
+};
+
+var saveCrimes = function saveCrimes(err, data, callback) {
+    if (err) {
+        throw err;
+    }
+    crimes = data;
+    console.log('crimes', crimes);
+    callback(null);
+};
+
+var drawAll = function drawAll() {
+    drawNeighborhoods();
+    drawCrimeData();
+};
+
+var drawNeighborhoods = function drawNeighborhoods() {
+    console.log('drawing neighhborhoods', neighborhoods);
+    var transform = _d2.default.geo.transform({ point: projectPoint });
+
+    var path = _d2.default.geo.path().projection(transform);
+
+    console.log(neighborhoods.features);
+
+    var neighborhood = g.selectAll('.neighborhood').data(neighborhoods.features).enter().insert('path').classed({ 'neighborhood': 1 });
+
+    map.on('viewreset', reset);
+
+    reset();
+
+    function reset() {
+        var bounds = path.bounds(neighborhoods),
+            topLeft = bounds[0],
+            bottomRight = bounds[1];
+
+        svg.attr({
+            'width': bottomRight[0] - topLeft[1],
+            'height': bottomRight[1] - topLeft[1]
+        }).style({
+            'left': topLeft[0] + 'px',
+            'top': topLeft[1] + 'px'
+        });
+
+        g.attr({ transform: 'translate(' + -topLeft[0] + ', ' + -topLeft[1] + ')' });
+
+        neighborhood.attr('d', path);
+    }
+};
+
+var drawCrimeData = function drawCrimeData() {
+    console.log('drawing crime');
+};
+
+var loadingQueue = _d3Queue2.default.queue().defer(loadNeighborhoods).defer(loadCrimes).awaitAll(drawAll);
+
+function projectPoint(x, y) {
+    var point = map.latLngToLayerPoint(new _leaflet2.default.LatLng(y, x));
+    this.stream.point(point.x, point.y);
+}
+
+},{"babel-polyfill":1,"d3":192,"d3-queue":191,"leaflet":193,"topojson":194}]},{},[195])
 
 
 //# sourceMappingURL=all.js.map
