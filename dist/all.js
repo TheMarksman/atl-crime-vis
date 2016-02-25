@@ -38959,7 +38959,7 @@ var update = function update() {
 };
 
 var updateView = function updateView() {
-  var displayCrime = 'hidd';
+  var displayCrime = 'block';
   var displayNeighborhoods = 'none';
 
   if (map.getZoom() < 15) {
@@ -38971,10 +38971,9 @@ var updateView = function updateView() {
     display: displayCrime
   });
 
-  // svg.selectAll('.neighborhood')
-  // .style({
-  //   display: displayNeighborhoods
-  // });
+  svg.selectAll('.neighborhood').style({
+    display: displayNeighborhoods
+  });
 };
 
 map.on('viewreset', update);

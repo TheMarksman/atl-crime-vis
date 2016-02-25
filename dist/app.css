@@ -1,10 +1,13 @@
 #map {
-  width: 60%;
-  height: 60%; }
+  height: 500px;
+  width: 600px; }
   #map .neighborhood {
     fill: #448AFF;
     opacity: 0.2;
     stroke: #003399;
-    stroke-width: 1px; }
+    stroke-width: 1.5px; }
+    #map .neighborhood:hover {
+      fill: #4CAF50;
+      fill-opacity: 0.7; }
 
 /*# sourceMappingURL=app.css.map */

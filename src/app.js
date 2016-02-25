@@ -119,7 +119,7 @@ let update = () => {
 };
 
 let updateView = () => {
-  let displayCrime = 'hidd';
+  let displayCrime = 'block';
   let displayNeighborhoods = 'none';
 
   if (map.getZoom() < 15) {
@@ -132,10 +132,10 @@ let updateView = () => {
       display: displayCrime
     });
 
-  // svg.selectAll('.neighborhood')
-  // .style({
-  //   display: displayNeighborhoods
-  // });
+  svg.selectAll('.neighborhood')
+  .style({
+    display: displayNeighborhoods
+  });
 };
 
 map.on('viewreset', update);
