@@ -43,6 +43,7 @@
     "vinyl-source-stream": "^1.1.0"
   },
   "dependencies": {
+    "cal-heatmap": "^3.6.0",
     "d3": "^3.5.14",
     "d3-queue": "^2.0.2",
     "leaflet": "^0.7.7",

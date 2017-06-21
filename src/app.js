@@ -1,14 +1,47 @@
 import 'babel-polyfill';
 import L from 'leaflet';
 import d3 from 'd3';
-import topojson from 'topojson';
+import * as topojson from 'topojson';
 import queue from 'd3-queue';
 import _ from 'lodash';
+import cal from 'cal-heatmap';
+
+window.d3 = d3;
+
+let crimeTypes = [
+    'BURGLARY-NONRES',
+    'LARCENY-FROM VEHICLE',
+    'AUTO THEFT',
+    'LARCENY-NON VEHICLE',
+    'ROBBERY-PEDESTRIAN',
+    'AGG ASSAULT',
+    'BURGLARY-RESIDENCE',
+    'ROBBERY-RESIDENCE',
+    'HOMICIDE',
+    'ROBBERY-COMMERCIAL',
+    'RAPE'
+  ];
+let crimeColorScale = d3.scale.ordinal()
+  .domain(crimeTypes)
+  .range([
+    '#b3de69',
+    '#ccebc5',
+    '#ffffb3',
+    '#d9d9d9',
+    '#bebada',
+    '#fdb462',
+    '#8dd3c7',
+    '#fccde5',
+    '#fb8072',
+    '#80b1d3',
+    '#bc80bd'
+  ]);
 
 let url = 'http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
 let osmAttrib = `&copy; <a href="http://www.openstreetmap.org/copyright">
   OpenStreetMap</a> contributors, &copy;
   <a href="http://cartodb.com/attributions">CartoDB</a>`;
+
 let osm = new L.TileLayer(url, {
   minZoom: 11,
   maxZoom: 18,
@@ -28,6 +61,7 @@ let path = d3.geo.path()
 
 let neighborhoods;
 let crimes;
+let crimeFilter;
 
 let loadNeighborhoods = (callback) => {
   d3.json('neighborhoods.json', (err, data) => {
@@ -64,6 +98,7 @@ let saveCrimes = (err, data, callback) => {
 let drawAll = () => {
   drawNeighborhoods();
   drawCrimeData();
+  drawLegend();
   update();
 };
 
@@ -85,9 +120,51 @@ let drawCrimeData = () => {
       .classed({crime: 1})
       .attr({r: 4})
       .style({
-        fill: 'red',
+        fill(d) {
+          return crimeColorScale(d.type);
+        },
         display: 'none'
       });
+};
+
+let drawLegend = () => {
+  let RECT_SIZE = 15;
+
+  let legend = d3.select('.legend');
+
+  legend.style({
+    height: RECT_SIZE * crimeTypes.length + 10 * crimeTypes.length
+  });
+
+  let legendRow = legend.selectAll('.legend-row')
+    .data(crimeTypes);
+
+  let item = legendRow.enter().append('div')
+    .classed({item: 1});
+
+  item.on('click', d => {
+    legend.selectAll('.item').style({'background-color': null});
+
+    if (crimeFilter === d) {
+      d3.select(this).style({'background-color': null});
+      crimeFilter = undefined;
+    } else {
+      d3.select(this).style({'background-color': '#d3d3d3'});
+      crimeFilter = d;
+    }
+
+    update();
+  });
+
+  item.append('div')
+    .classed({'item-color': 1})
+    .style({
+      'background-color'(d) { return crimeColorScale(d); },
+    });
+
+  item.append('span')
+    .classed({'item-text': 1})
+    .text(d => d);
 };
 
 let update = () => {
@@ -111,12 +188,23 @@ let update = () => {
 
   g.selectAll('.crime')
     .attr({
+      opacity(d) { 
+        return !_.isUndefined(crimeFilter) ? displayBasedOnFilter(d) : 1
+      },
       transform(d) {
         let p = map.latLngToLayerPoint(new L.LatLng(d.y, d.x));
         return `translate(${p.x}, ${p.y})`;
       }
     });
 };
+
+let displayBasedOnFilter = (d) => {
+  if (_.isUndefined(crimeFilter) || 
+      crimeFilter === d.type) {
+    return 1;
+  }
+  return 0;
+}
 
 let updateView = () => {
   let displayCrime = 'block';
@@ -150,3 +238,17 @@ function projectPoint(x, y) {
   let point = map.latLngToLayerPoint(new L.LatLng(y, x));
   this.stream.point(point.x, point.y);
 }
+
+
+// Initialize calendar
+let calendar = new cal();
+
+calendar.init({
+  itemSelector: '.calendar',
+  domain: 'month',
+  subDomain: 'x_day',
+  cellSize: 20, 
+  subDomainTextFormat: '%d',
+  range: 12,
+});
+
